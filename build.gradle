@@ -7,7 +7,7 @@ sourceCompatibility = JavaVersion.VERSION_1_8
 targetCompatibility = JavaVersion.VERSION_1_8
 
 buildDir = 'build-gradle'
-mainClassName = ''
+mainClassName = 'by.ep.util.trackviewer.ui.TrackViewer'
 
 dependencies {
 
