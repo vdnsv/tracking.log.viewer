@@ -6,4 +6,7 @@ _____
 Execute
   1) gradle assemble
   2) Unpack distribution from build-gradle/distributions 
-  
+
+Or
+  gradle run
+    
