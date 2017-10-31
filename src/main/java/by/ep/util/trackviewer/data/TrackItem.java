@@ -18,7 +18,7 @@ public class TrackItem extends AbstractTrackItem {
     public int sqlTime;
     public String other;
     public DumpItem dump;
-    public List<AbstractTrackItem> children;
+    public List<TrackItem> children;
 
     public TrackItem(String time, String thread, String name, String typ, String id, String parentId,
                      String startTime, int processTime, int otherInvocationsCount, int otherInvocationsTime,
