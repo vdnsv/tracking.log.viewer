@@ -64,12 +64,12 @@ public class TrackViewer {
                 "name",
                 "time",
                 "duration",
-                "SQL-Dur",
-                "SQL-Cnt",
-                "TYPE",
-                "Thread",
-                "ID",
-                "Params"
+                "sqlTime",
+                "sqlCount",
+                "typ",
+                "thread",
+                "id",
+                "params"
         };
 
         for (int i = 0; i < columsWidth.length; i++) {
@@ -181,7 +181,7 @@ public class TrackViewer {
     private static void scanDir(final String dirName, TrackData trackData)
             throws IOException {
 
-        trackData.logLoader = new TrackingLogLoader(dirName, trackData.tree);
+        trackData.logLoader = new TrackingLogLoader(dirName);
         trackData.logLoader.scan();
         trackData.tree.removeAll();
         trackData.paginationControl.setCurrentPage(1);
@@ -203,22 +203,21 @@ public class TrackViewer {
         });
     }
 
-    private static void addTreeChildItems(List<AbstractTrackItem> children, TreeItem parentTreeItem, Font boldFont) {
+    private static void addTreeChildItems(List<TrackItem> children, TreeItem parentTreeItem, Font boldFont) {
 
-        for (AbstractTrackItem abstractTrackItem : children) {
+        for (TrackItem trackItem : children) {
             TreeItem treeItem = new TreeItem(parentTreeItem, SWT.NONE);
 
-            if (abstractTrackItem instanceof TrackItem) {
-                TrackItem trackItem = (TrackItem) abstractTrackItem;
-                setTreeItemText(trackItem, treeItem);
-                if (trackItem.children != null && !trackItem.children.isEmpty()) {
-                    addTreeChildItems(trackItem.children, treeItem, boldFont);
-                }
-            } else {
-                DumpItem dumpItem = (DumpItem) abstractTrackItem;
-                treeItem.setText(new String[]{"Dump", "", "", "", "", dumpItem.state, dumpItem.thread, dumpItem.id,
-                        dumpItem.isNative ? "native" : "not native"});
-                for (String dump : dumpItem.dump) {
+            setTreeItemText(trackItem, treeItem);
+            if (trackItem.children != null && !trackItem.children.isEmpty()) {
+                addTreeChildItems(trackItem.children, treeItem, boldFont);
+            }
+
+            if (trackItem.dump != null && trackItem.dump.dump != null && !trackItem.dump.dump.isEmpty()) {
+                TreeItem dumpTreeItem = new TreeItem(parentTreeItem, SWT.NONE);
+                dumpTreeItem.setText(new String[]{"Dump", "", "", "", "", trackItem.dump.state, trackItem.dump.thread, trackItem.dump.id,
+                        trackItem.dump.isNative ? "native" : "not native"});
+                for (String dump : trackItem.dump.dump) {
                     TreeItem dumpChild = new TreeItem(treeItem, SWT.NONE);
                     dumpChild.setText(dump);
                     if (dump.startsWith("\tcom.") && !dump.startsWith("\tcom.sun.")) {
@@ -234,8 +233,9 @@ public class TrackViewer {
 
         List<TrackItem> filteredAndSortedItems = trackData.logLoader.getRootItems().stream()
 
-                .filter((TrackItem o) -> o.name != null || (o.children != null && (o.children.size() > 1
-                        || o.children.size() == 1 && !(o.children.get(0) instanceof DumpItem))))
+                .filter((TrackItem o) -> o.name != null
+                        || (o.children != null && o.children.size() > 0)
+                        || (o.dump != null && o.dump.dump != null && !o.dump.dump.isEmpty()))
 
                 .filter((TrackItem trackItem) -> filterTrackItem(trackItem, trackItemFieldsProvider,
                         trackData.filterExpression, trackData.isDeep))
@@ -244,8 +244,8 @@ public class TrackViewer {
                         Collectors.toList());
         trackData.paginationControl.setRecordsCount(filteredAndSortedItems.size());
 
-        int fromIndex = (trackData.paginationControl.getCurrentPage() - 1) * trackData.paginationControl.ITEMS_PER_PAGE;
-        int toIndex = fromIndex + trackData.paginationControl.ITEMS_PER_PAGE;
+        int fromIndex = (trackData.paginationControl.getCurrentPage() - 1) * PaginationControl.ITEMS_PER_PAGE;
+        int toIndex = fromIndex + PaginationControl.ITEMS_PER_PAGE;
         if (toIndex >= filteredAndSortedItems.size()) {
             toIndex = filteredAndSortedItems.size();
         }
@@ -266,11 +266,9 @@ public class TrackViewer {
             return false;
         }
         if (trackItem.children != null && !trackItem.children.isEmpty()) {
-            for (AbstractTrackItem abstractTrackItem : trackItem.children) {
-                if (abstractTrackItem instanceof TrackItem) {
-                    if ((Boolean) filterExpression.execute((TrackItem) abstractTrackItem, trackItemFieldsProvider)) {
-                        return true;
-                    }
+            for (TrackItem childTrackItem : trackItem.children) {
+                if (filterTrackItem(childTrackItem, trackItemFieldsProvider, filterExpression, isDeep)) {
+                    return true;
                 }
             }
         }

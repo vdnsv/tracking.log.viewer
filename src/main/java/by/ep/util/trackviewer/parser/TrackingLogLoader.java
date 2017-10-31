@@ -3,19 +3,22 @@ package by.ep.util.trackviewer.parser;
 import by.ep.util.trackviewer.data.DumpItem;
 import by.ep.util.trackviewer.data.ThreadStatItem;
 import by.ep.util.trackviewer.data.TrackItem;
-import org.eclipse.swt.widgets.Tree;
 
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.time.format.DateTimeFormatter;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Scanner;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class TrackingLogLoader {
-    private static final DateTimeFormatter dateFormat = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss,SSS");
+    // private static final DateTimeFormatter dateFormat = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss,SSS");
 
     private static final int START_ITEM_DEF_PROCESS_TIME = 999999;
     private static final String TIME_PATTERNS = "(\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2},\\d{3})";
@@ -89,12 +92,10 @@ public class TrackingLogLoader {
 
 
     private String dirName;
-    private Tree tree;
 
-    public TrackingLogLoader(final String dirName, Tree tree) {
+    public TrackingLogLoader(final String dirName) {
 
         this.dirName = dirName;
-        this.tree = tree;
     }
 
     public void scan() throws IOException {
@@ -172,7 +173,6 @@ public class TrackingLogLoader {
         try (Scanner scanner = new Scanner(trackingLogFile)) {
             DumpItem dumpItem = null;
             TrackItem lastTrackItem = null;
-            int lastId = -1;
             while (scanner.hasNext()) {
                 final String line = scanner.nextLine();
                 if (!line.trim().isEmpty() && !line.contains(" (SamplerRunner) Tick: ")) {
@@ -222,14 +222,13 @@ public class TrackingLogLoader {
 
                         if (trackItem.id != null) {
                             int newId = Integer.parseInt(trackItem.id);
-                            if (newId == 1 || newId + 400 < lastId) {
+                            if (newId == 1) {
                                 // if server was restarted
                                 idToItemMap.clear();
                                 System.out.println(
                                         "Found server restart in file: " + trackingLogFile.getName() + " time: "
-                                                + trackItem.time);
+                                                + trackItem.time + " line: " + line);
                             }
-                            lastId = newId;
                         }
 
                         lastTrackItem = processTrackItem(trackItem, isStartItem);
@@ -253,17 +252,6 @@ public class TrackingLogLoader {
                                 toInt(matcher.group(23), 0),
                                 matcher.group(24)
                         );
-                        if (trackItem.id != null) {
-                            int newId = Integer.parseInt(trackItem.id);
-                            if (newId == 1 || newId + 400 < lastId) {
-                                // if server was restarted
-                                idToItemMap.clear();
-                                System.out.println(
-                                        "Found server restart in file: " + trackingLogFile.getName() + " time: "
-                                                + trackItem.time);
-                            }
-                            lastId = newId;
-                        }
                         lastTrackItem = processTrackItem(trackItem, false);
                         dumpItem = null;
                     } else if (line.startsWith("Additional Info: ")) {
@@ -431,12 +419,6 @@ public class TrackingLogLoader {
                         i++;
                     }
                 }
-
-                // add dump to as child to current item
-                if (trackItem.children == null) {
-                    trackItem.children = new ArrayList<>();
-                }
-                trackItem.children.add(trackItem.dump);
             }
         }
     }

@@ -14,8 +14,12 @@ public class TrackItemFieldsProvider extends FieldsProvider<TrackItem, Object> {
                 return trackItem.processTime;
             case "time":
                 return trackItem.time;
+            case "thread":
+                return trackItem.thread;
             case "typ":
                 return trackItem.typ;
+            case "id":
+                return trackItem.id;
             case "parentId":
                 return trackItem.parentId;
             case "startTime":
