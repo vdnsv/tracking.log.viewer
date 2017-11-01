@@ -6,6 +6,7 @@ import by.ep.util.trackviewer.data.DumpItem;
 import by.ep.util.trackviewer.data.TrackItem;
 import by.ep.util.trackviewer.filter.Expression;
 import by.ep.util.trackviewer.parser.TrackingLogLoader;
+
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.events.SelectionEvent;
 import org.eclipse.swt.events.SelectionListener;
@@ -121,7 +122,6 @@ public class TrackViewer {
         paginationControl.setPageNumberChangedFunction(
                 (PaginationControl pagesControl) -> generateTree(trackData));
 
-
         readParameters(filesSelectControl, filterControl);
 
         shell.pack();
@@ -136,6 +136,7 @@ public class TrackViewer {
     }
 
     private static void readParameters(FilesSelectControl filesSelectControl, FilterControl filterControl) {
+
         File f = new File(PROPERTIES_FILE_NAME);
         if (f.exists()) {
             try {
@@ -152,6 +153,7 @@ public class TrackViewer {
     }
 
     private static void saveParameters(final String parameterName, final String parameterValue) {
+
         Properties p = new Properties();
         p.setProperty(parameterName, parameterValue);
         try {
@@ -213,22 +215,29 @@ public class TrackViewer {
                 addTreeChildItems(trackItem.children, treeItem, boldFont);
             }
 
-            if (trackItem.dump != null && trackItem.dump.dump != null && !trackItem.dump.dump.isEmpty()) {
-                TreeItem dumpTreeItem = new TreeItem(parentTreeItem, SWT.NONE);
-                dumpTreeItem.setText(new String[]{"Dump", "", "", "", "", trackItem.dump.state, trackItem.dump.thread, trackItem.dump.id,
-                        trackItem.dump.isNative ? "native" : "not native"});
-                for (String dump : trackItem.dump.dump) {
-                    TreeItem dumpChild = new TreeItem(treeItem, SWT.NONE);
-                    dumpChild.setText(dump);
-                    if (dump.startsWith("\tcom.") && !dump.startsWith("\tcom.sun.")) {
-                        dumpChild.setFont(boldFont);
-                    }
+            addDump(boldFont, trackItem, treeItem);
+        }
+    }
+
+    private static void addDump(Font boldFont, TrackItem trackItem, TreeItem treeItem) {
+
+        if (trackItem.dump != null && trackItem.dump.dump != null && !trackItem.dump.dump.isEmpty()) {
+            TreeItem dumpTreeItem = new TreeItem(treeItem, SWT.NONE);
+            dumpTreeItem.setText(
+                    new String[]{"Dump", "", "", "", "", trackItem.dump.state, trackItem.dump.thread, trackItem.dump.id,
+                            trackItem.dump.isNative ? "native" : "not native"});
+            for (String dump : trackItem.dump.dump) {
+                TreeItem dumpChild = new TreeItem(dumpTreeItem, SWT.NONE);
+                dumpChild.setText(dump);
+                if (dump.startsWith("\tcom.") && !dump.startsWith("\tcom.sun.")) {
+                    dumpChild.setFont(boldFont);
                 }
             }
         }
     }
 
     private static List<TrackItem> filterItems(TrackData trackData) {
+
         TrackItemFieldsProvider trackItemFieldsProvider = new TrackItemFieldsProvider();
 
         List<TrackItem> filteredAndSortedItems = trackData.logLoader.getRootItems().stream()
@@ -252,7 +261,8 @@ public class TrackViewer {
         return filteredAndSortedItems.subList(fromIndex, toIndex);
     }
 
-    private static boolean filterTrackItem(TrackItem trackItem, TrackItemFieldsProvider trackItemFieldsProvider, Expression filterExpression, boolean isDeep) {
+    private static boolean filterTrackItem(TrackItem trackItem, TrackItemFieldsProvider trackItemFieldsProvider,
+            Expression filterExpression, boolean isDeep) {
 
         if (filterExpression == null) {
             return true;
@@ -287,6 +297,7 @@ public class TrackViewer {
             if (rootTrackItem.children != null && !rootTrackItem.children.isEmpty()) {
                 addTreeChildItems(rootTrackItem.children, treeItem, trackData.boldFont);
             }
+            addDump(trackData.boldFont, rootTrackItem, treeItem);
         }
     }
 
@@ -300,7 +311,7 @@ public class TrackViewer {
         Font boldFont;
 
         public TrackData(Tree tree, TrackingLogLoader logLoader, PaginationControl paginationControl,
-                         Expression filterExpression) {
+                Expression filterExpression) {
 
             this.tree = tree;
             this.logLoader = logLoader;

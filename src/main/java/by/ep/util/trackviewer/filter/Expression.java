@@ -5,6 +5,7 @@ public abstract class Expression {
     public abstract Object execute(Object object, FieldsProvider fieldsProvider);
 
     static class Num extends Expression {
+
         private final long value;
 
         Num(long x) {

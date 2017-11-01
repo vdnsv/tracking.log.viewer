@@ -192,7 +192,7 @@ public class TrackingLogLoader {
                                 Boolean.parseBoolean(matcher.group(5)));
                         final String threadName = dumpItem.thread;
                         if (threadName != null) {
-                            for (int i = trackItems.size() - 1; i > 0 && i > trackItems.size() - 400; i--) {
+                            for (int i = trackItems.size() - 1; i >= 0 && i > trackItems.size() - 1000; i--) {
                                 TrackItem item = trackItems.get(i);
                                 if (threadName.equals(item.thread) && item.parentId == null) {
                                     item.dump = dumpItem;
@@ -274,6 +274,7 @@ public class TrackingLogLoader {
 
 
     private TrackItem findStartTrackItem(TrackItem endItem) {
+
         TrackItem startTrackItem = idToItemMap.get(endItem.id);
         /*
         String startItemTime = startTrackItem.startTime;
