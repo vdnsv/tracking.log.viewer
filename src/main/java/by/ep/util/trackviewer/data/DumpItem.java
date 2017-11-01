@@ -3,12 +3,14 @@ package by.ep.util.trackviewer.data;
 import java.util.ArrayList;
 import java.util.List;
 
-public class DumpItem extends AbstractTrackItem {
+public class DumpItem {
 
-    public String state;
-    public boolean isNative;
+    public final String id;
+    public final String thread;
+    public final String state;
+    public final boolean isNative;
 
-    public List<String> dump = new ArrayList<>();
+    public final List<String> dump = new ArrayList<>();
 
     public DumpItem(String id, String thread, String state, boolean isNative) {
 

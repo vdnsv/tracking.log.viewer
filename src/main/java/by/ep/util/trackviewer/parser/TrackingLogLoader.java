@@ -1,9 +1,5 @@
 package by.ep.util.trackviewer.parser;
 
-import by.ep.util.trackviewer.data.DumpItem;
-import by.ep.util.trackviewer.data.ThreadStatItem;
-import by.ep.util.trackviewer.data.TrackItem;
-
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -16,6 +12,10 @@ import java.util.Map.Entry;
 import java.util.Scanner;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import by.ep.util.trackviewer.data.DumpItem;
+import by.ep.util.trackviewer.data.ThreadStatItem;
+import by.ep.util.trackviewer.data.TrackItem;
 
 public class TrackingLogLoader {
     // private static final DateTimeFormatter dateFormat = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss,SSS");
@@ -191,11 +191,14 @@ public class TrackingLogLoader {
                         dumpItem = new DumpItem(matcher.group(1), matcher.group(2), matcher.group(4),
                                 Boolean.parseBoolean(matcher.group(5)));
                         final String threadName = dumpItem.thread;
-                        if (threadName != null) {
+                        if (threadName != null && !dumpItem.isNative) {
                             for (int i = trackItems.size() - 1; i >= 0 && i > trackItems.size() - 1000; i--) {
                                 TrackItem item = trackItems.get(i);
                                 if (threadName.equals(item.thread) && item.parentId == null) {
-                                    item.dump = dumpItem;
+                                    if (item.dump == null) {
+                                        item.dump = new ArrayList<>();
+                                    }
+                                    item.dump.add(dumpItem);
                                     break;
                                 }
                             }
@@ -404,20 +407,21 @@ public class TrackingLogLoader {
     private void buildTree() {
 
         for (TrackItem trackItem : trackItems) {
-            if (trackItem.dump != null && !trackItem.dump.dump.isEmpty() && !(trackItem.dump.isNative
-                    && trackItem.dump.dump.size() == 1)) {
+            if (trackItem.dump != null && !trackItem.dump.isEmpty()) {
 
-                // expand dump
-                int i = 0;
-                while (i < trackItem.dump.dump.size()) {
-                    final String hash = trackItem.dump.dump.get(i);
-                    List<String> cachedStack;
-                    if (hash.length() == 40 && ((cachedStack = stackItems.get(hash)) != null)) {
-                        trackItem.dump.dump.remove(i);
-                        trackItem.dump.dump.addAll(i, cachedStack);
-                        i += cachedStack.size();
-                    } else {
-                        i++;
+                for (DumpItem dumpItem : trackItem.dump) {
+                    // expand dump
+                    int i = 0;
+                    while (i < dumpItem.dump.size()) {
+                        final String hash = dumpItem.dump.get(i);
+                        List<String> cachedStack;
+                        if (hash.length() == 40 && ((cachedStack = stackItems.get(hash)) != null)) {
+                            dumpItem.dump.remove(i);
+                            dumpItem.dump.addAll(i, cachedStack);
+                            i += cachedStack.size();
+                        } else {
+                            i++;
+                        }
                     }
                 }
             }

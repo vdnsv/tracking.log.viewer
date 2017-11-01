@@ -2,11 +2,13 @@ package by.ep.util.trackviewer.data;
 
 import java.util.List;
 
-public class TrackItem extends AbstractTrackItem {
+public class TrackItem {
 
     public String time;
     public String name;
     public String typ;
+    public String thread;
+    public String id;
     public String parentId;
     public String startTime;
     public int processTime;
@@ -17,12 +19,12 @@ public class TrackItem extends AbstractTrackItem {
     public int sqlCount;
     public int sqlTime;
     public String other;
-    public DumpItem dump;
+    public List<DumpItem> dump;
     public List<TrackItem> children;
 
     public TrackItem(String time, String thread, String name, String typ, String id, String parentId,
-                     String startTime, int processTime, int otherInvocationsCount, int otherInvocationsTime,
-                     String othersStart, String othersFinish, int sqlCount, int sqlTime, String other) {
+            String startTime, int processTime, int otherInvocationsCount, int otherInvocationsTime,
+            String othersStart, String othersFinish, int sqlCount, int sqlTime, String other) {
 
         this.time = time;
         this.thread = thread;

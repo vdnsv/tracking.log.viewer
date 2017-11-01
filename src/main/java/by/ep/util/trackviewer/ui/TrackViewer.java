@@ -1,11 +1,14 @@
 package by.ep.util.trackviewer.ui;
 
 
-import by.ep.util.trackviewer.data.AbstractTrackItem;
-import by.ep.util.trackviewer.data.DumpItem;
-import by.ep.util.trackviewer.data.TrackItem;
-import by.ep.util.trackviewer.filter.Expression;
-import by.ep.util.trackviewer.parser.TrackingLogLoader;
+import java.io.BufferedInputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.util.List;
+import java.util.Properties;
+import java.util.stream.Collectors;
 
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.events.SelectionEvent;
@@ -22,14 +25,10 @@ import org.eclipse.swt.widgets.TreeColumn;
 import org.eclipse.swt.widgets.TreeItem;
 import org.eclipse.swt.widgets.Widget;
 
-import java.io.BufferedInputStream;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.util.List;
-import java.util.Properties;
-import java.util.stream.Collectors;
+import by.ep.util.trackviewer.data.DumpItem;
+import by.ep.util.trackviewer.data.TrackItem;
+import by.ep.util.trackviewer.filter.Expression;
+import by.ep.util.trackviewer.parser.TrackingLogLoader;
 
 public class TrackViewer {
 
@@ -154,15 +153,15 @@ public class TrackViewer {
 
     private static void saveParameters(final String parameterName, final String parameterValue) {
 
-        Properties p = new Properties();
-        p.setProperty(parameterName, parameterValue);
         try {
+            Properties p = new Properties();
             File f = new File(PROPERTIES_FILE_NAME);
             if (f.exists()) {
                 try (BufferedInputStream bis = new BufferedInputStream(new FileInputStream(f))) {
                     p.load(bis);
                 }
             }
+            p.setProperty(parameterName, parameterValue);
             try (FileOutputStream fos = new FileOutputStream(f)) {
                 p.store(fos, "");
             }
@@ -219,20 +218,31 @@ public class TrackViewer {
         }
     }
 
-    private static void addDump(Font boldFont, TrackItem trackItem, TreeItem treeItem) {
+    private static void addDump(final Font boldFont, final TrackItem trackItem, final TreeItem treeItem) {
 
-        if (trackItem.dump != null && trackItem.dump.dump != null && !trackItem.dump.dump.isEmpty()) {
-            TreeItem dumpTreeItem = new TreeItem(treeItem, SWT.NONE);
-            dumpTreeItem.setText(
-                    new String[]{"Dump", "", "", "", "", trackItem.dump.state, trackItem.dump.thread, trackItem.dump.id,
-                            trackItem.dump.isNative ? "native" : "not native"});
-            for (String dump : trackItem.dump.dump) {
-                TreeItem dumpChild = new TreeItem(dumpTreeItem, SWT.NONE);
-                dumpChild.setText(dump);
-                if (dump.startsWith("\tcom.") && !dump.startsWith("\tcom.sun.")) {
-                    dumpChild.setFont(boldFont);
+        if (trackItem.dump != null && !trackItem.dump.isEmpty()) {
+            final TreeItem samplingInfoTreeItem = new TreeItem(treeItem, SWT.NONE);
+            samplingInfoTreeItem.setText(
+                    new String[]{"Sampling Info", "", "", "", "", "", "", "", ""});
+
+            treeItem.getDisplay().asyncExec(() -> {
+
+                for (DumpItem dumpItem : trackItem.dump) {
+                    TreeItem dumpTreeItem = new TreeItem(samplingInfoTreeItem, SWT.NONE);
+                    dumpTreeItem.setText(
+                            new String[]{"Dump", "", "", "", "", dumpItem.state, dumpItem.thread,
+                                    dumpItem.id,
+                                    dumpItem.isNative ? "native" : "not native"});
+                    for (String dump : dumpItem.dump) {
+                        TreeItem dumpChild = new TreeItem(dumpTreeItem, SWT.NONE);
+                        dumpChild.setText(dump);
+                        if (dump.startsWith("\tcom.") && !dump.startsWith("\tcom.sun.")) {
+                            dumpChild.setFont(boldFont);
+                        }
+                    }
                 }
             }
+            );
         }
     }
 
@@ -243,8 +253,8 @@ public class TrackViewer {
         List<TrackItem> filteredAndSortedItems = trackData.logLoader.getRootItems().stream()
 
                 .filter((TrackItem o) -> o.name != null
-                        || (o.children != null && o.children.size() > 0)
-                        || (o.dump != null && o.dump.dump != null && !o.dump.dump.isEmpty()))
+                        || (o.children != null && !o.children.isEmpty())
+                        || (o.dump != null && !o.dump.isEmpty()))
 
                 .filter((TrackItem trackItem) -> filterTrackItem(trackItem, trackItemFieldsProvider,
                         trackData.filterExpression, trackData.isDeep))
