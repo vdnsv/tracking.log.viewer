@@ -11,6 +11,7 @@ import java.util.Properties;
 import java.util.stream.Collectors;
 
 import org.eclipse.swt.SWT;
+import org.eclipse.swt.custom.SashForm;
 import org.eclipse.swt.events.SelectionEvent;
 import org.eclipse.swt.events.SelectionListener;
 import org.eclipse.swt.graphics.Font;
@@ -55,8 +56,10 @@ public class TrackViewer {
         PaginationControl paginationControl = new PaginationControl(shell);
         paginationControl.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, false, 1, 1));
 
-        Tree tree = new Tree(shell, SWT.BORDER | SWT.H_SCROLL | SWT.V_SCROLL | SWT.FULL_SELECTION);
-        tree.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true, 1, 1));
+        SashForm sashForm = new SashForm(shell, SWT.VERTICAL);
+        sashForm.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true, 1, 1));
+
+        Tree tree = new Tree(sashForm, SWT.BORDER | SWT.H_SCROLL | SWT.V_SCROLL | SWT.FULL_SELECTION);
         tree.setHeaderVisible(true);
 
         int[] columsWidth = {300, 150, 100, 100, 80, 120, 200, 50, 250};
@@ -78,28 +81,26 @@ public class TrackViewer {
             column.setWidth(columsWidth[i]);
         }
 
-        Text otherInfoText = new Text(shell, SWT.BORDER | SWT.V_SCROLL | SWT.WRAP);
-        GridData gridData = new GridData(SWT.FILL, SWT.FILL, true, false, 1, 1);
-        gridData.heightHint = 80;
-        otherInfoText.setLayoutData(gridData);
+        Text otherInfoText = new Text(sashForm, SWT.BORDER | SWT.V_SCROLL | SWT.WRAP);
+        sashForm.setWeights(new int[]{3, 1});
+
+        final TrackData trackData = new TrackData(tree, null, paginationControl, null);
+        trackData.paginationControl = paginationControl;
+        tree.setData(trackData);
 
         tree.addSelectionListener(new SelectionListener() {
             @Override
             public void widgetSelected(SelectionEvent e) {
 
-                onItemSelected(e.item, otherInfoText);
+                onItemSelected(e.item, otherInfoText, trackData);
             }
 
             @Override
             public void widgetDefaultSelected(SelectionEvent e) {
 
-                onItemSelected(e.item, otherInfoText);
+                onItemSelected(e.item, otherInfoText, trackData);
             }
         });
-
-        TrackData trackData = new TrackData(tree, null, paginationControl, null);
-        trackData.paginationControl = paginationControl;
-        tree.setData(trackData);
 
         filesSelectControl.setScanButtonClickFunc((String dirName) -> {
             otherInfoText.setText("");
@@ -114,7 +115,9 @@ public class TrackViewer {
         filterControl.setFilterButtonClickFunc((Expression expression, Boolean isDeep) -> {
             trackData.filterExpression = expression;
             trackData.isDeep = isDeep.booleanValue();
-            generateTree(trackData);
+            if (trackData.logLoader != null) {
+                generateTree(trackData);
+            }
             saveParameters(FILTER_PARAM, filterControl.getFilterText());
         });
 
@@ -124,6 +127,7 @@ public class TrackViewer {
         readParameters(filesSelectControl, filterControl);
 
         shell.pack();
+        shell.setBounds(display.getClientArea());
         shell.open();
         while (!shell.isDisposed()) {
             if (!display.readAndDispatch()) {
@@ -170,11 +174,35 @@ public class TrackViewer {
         }
     }
 
-    private static void onItemSelected(Widget item, Text otherInfoText) {
+    private static void onItemSelected(Widget item, Text otherInfoText, TrackData trackData) {
 
         if (item instanceof TreeItem) {
-            String text = ((TreeItem) item).getText(8);
-            otherInfoText.setText(text);
+            TreeItem treeItem = (TreeItem) item;
+            if (treeItem.getData() instanceof DumpItem) {
+                DumpItem dumpItem = (DumpItem) treeItem.getData();
+                otherInfoText.setText(String.join("\n", dumpItem.dump));
+                if (treeItem.getItemCount() == 0 && !dumpItem.dump.isEmpty()) {
+                    treeItem.getDisplay().asyncExec(new Runnable() {
+                        @Override
+                        public void run() {
+
+                            for (String dump : dumpItem.dump) {
+                                TreeItem dumpChild = new TreeItem(treeItem, SWT.NONE);
+                                dumpChild.setText(dump);
+                                if (dump.startsWith("\tcom.") && !dump.startsWith("\tcom.sun.")) {
+                                    dumpChild.setFont(trackData.boldFont);
+                                }
+                            }
+                        }
+                    });
+                }
+            } else {
+                String text = treeItem.getText(8);
+                if (treeItem.getData() instanceof TrackItem) {
+                    text += "\n\n" + ((TrackItem) treeItem.getData()).toString();
+                }
+                otherInfoText.setText(text);
+            }
         }
     }
 
@@ -192,6 +220,7 @@ public class TrackViewer {
 
     private static void setTreeItemText(TrackItem trackItem, TreeItem treeItem) {
 
+        treeItem.setData(trackItem);
         treeItem.setText(new String[]{trackItem.name,
                 trackItem.time,
                 Integer.toString(trackItem.processTime),
@@ -227,21 +256,15 @@ public class TrackViewer {
 
             treeItem.getDisplay().asyncExec(() -> {
 
-                for (DumpItem dumpItem : trackItem.dump) {
-                    TreeItem dumpTreeItem = new TreeItem(samplingInfoTreeItem, SWT.NONE);
-                    dumpTreeItem.setText(
-                            new String[]{"Dump", "", "", "", "", dumpItem.state, dumpItem.thread,
-                                    dumpItem.id,
-                                    dumpItem.isNative ? "native" : "not native"});
-                    for (String dump : dumpItem.dump) {
-                        TreeItem dumpChild = new TreeItem(dumpTreeItem, SWT.NONE);
-                        dumpChild.setText(dump);
-                        if (dump.startsWith("\tcom.") && !dump.startsWith("\tcom.sun.")) {
-                            dumpChild.setFont(boldFont);
+                        for (DumpItem dumpItem : trackItem.dump) {
+                            TreeItem dumpTreeItem = new TreeItem(samplingInfoTreeItem, SWT.NONE);
+                            dumpTreeItem.setText(
+                                    new String[]{"Dump", "", "", "", "", dumpItem.state, dumpItem.thread,
+                                            dumpItem.id,
+                                            dumpItem.isNative ? "native" : "not native"});
+                            dumpTreeItem.setData(dumpItem);
                         }
                     }
-                }
-            }
             );
         }
     }

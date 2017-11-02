@@ -109,5 +109,8 @@ public class FilterControl  extends Composite {
 
     public void setFilterText(final String filterText) {
         this.filterText.setText(filterText);
+        if (filterText != null && !filterText.isEmpty()) {
+            this.filterButtonClick(filterText, false);
+        }
     }
 }

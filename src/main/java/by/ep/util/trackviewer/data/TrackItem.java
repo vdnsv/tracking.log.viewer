@@ -46,4 +46,24 @@ public class TrackItem {
             this.time = startTime;
         }
     }
+
+    @Override
+    public String toString() {
+
+        return "" +
+                "time='" + time + '\'' +
+                ", name='" + name + '\'' +
+                ", typ='" + typ + '\'' +
+                ", thread='" + thread + '\'' +
+                ", id='" + id + '\'' +
+                ", parentId='" + parentId + '\'' +
+                ", startTime='" + startTime + '\'' +
+                ", processTime=" + processTime +
+                ", otherInvocationsCount=" + otherInvocationsCount +
+                ", otherInvocationsTime=" + otherInvocationsTime +
+                ", othersStart='" + othersStart + '\'' +
+                ", othersFinish='" + othersFinish + '\'' +
+                ", sqlCount=" + sqlCount +
+                ", sqlTime=" + sqlTime;
+    }
 }
