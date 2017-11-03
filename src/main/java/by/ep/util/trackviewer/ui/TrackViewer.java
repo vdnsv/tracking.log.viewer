@@ -6,6 +6,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
 import java.util.stream.Collectors;
@@ -19,6 +20,7 @@ import org.eclipse.swt.graphics.FontData;
 import org.eclipse.swt.layout.GridData;
 import org.eclipse.swt.layout.GridLayout;
 import org.eclipse.swt.widgets.Display;
+import org.eclipse.swt.widgets.MessageBox;
 import org.eclipse.swt.widgets.Shell;
 import org.eclipse.swt.widgets.Text;
 import org.eclipse.swt.widgets.Tree;
@@ -271,27 +273,37 @@ public class TrackViewer {
 
     private static List<TrackItem> filterItems(TrackData trackData) {
 
-        TrackItemFieldsProvider trackItemFieldsProvider = new TrackItemFieldsProvider();
+        try {
+            TrackItemFieldsProvider trackItemFieldsProvider = new TrackItemFieldsProvider();
 
-        List<TrackItem> filteredAndSortedItems = trackData.logLoader.getRootItems().stream()
+            List<TrackItem> filteredAndSortedItems = trackData.logLoader.getRootItems().stream()
 
-                .filter((TrackItem o) -> o.name != null
-                        || (o.children != null && !o.children.isEmpty())
-                        || (o.dump != null && !o.dump.isEmpty()))
+                    .filter((TrackItem o) -> o.name != null
+                            || (o.children != null && !o.children.isEmpty())
+                            || (o.dump != null && !o.dump.isEmpty()))
 
-                .filter((TrackItem trackItem) -> filterTrackItem(trackItem, trackItemFieldsProvider,
-                        trackData.filterExpression, trackData.isDeep))
+                    .filter((TrackItem trackItem) -> filterTrackItem(trackItem, trackItemFieldsProvider,
+                            trackData.filterExpression, trackData.isDeep))
 
-                .sorted((TrackItem o1, TrackItem o2) -> (o1.time == null ? "" : o1.time).compareTo(o2.time)).collect(
-                        Collectors.toList());
-        trackData.paginationControl.setRecordsCount(filteredAndSortedItems.size());
+                    .sorted((TrackItem o1, TrackItem o2) -> (o1.time == null ? "" : o1.time).compareTo(o2.time))
+                    .collect(
+                            Collectors.toList());
+            trackData.paginationControl.setRecordsCount(filteredAndSortedItems.size());
 
-        int fromIndex = (trackData.paginationControl.getCurrentPage() - 1) * PaginationControl.ITEMS_PER_PAGE;
-        int toIndex = fromIndex + PaginationControl.ITEMS_PER_PAGE;
-        if (toIndex >= filteredAndSortedItems.size()) {
-            toIndex = filteredAndSortedItems.size();
+            int fromIndex = (trackData.paginationControl.getCurrentPage() - 1) * PaginationControl.ITEMS_PER_PAGE;
+            int toIndex = fromIndex + PaginationControl.ITEMS_PER_PAGE;
+            if (toIndex >= filteredAndSortedItems.size()) {
+                toIndex = filteredAndSortedItems.size();
+            }
+            return filteredAndSortedItems.subList(fromIndex, toIndex);
+        } catch (Exception ex) {
+            MessageBox messageBox = new MessageBox(trackData.tree.getShell(), SWT.ICON_ERROR | SWT.OK);
+            messageBox.setText("Error");
+            messageBox.setMessage("Invalid filter expression! " + ex.getClass() + (ex.getMessage() == null ? "" :
+                    "\n" + ex.getMessage()));
+            messageBox.open();
+            return new ArrayList<>();
         }
-        return filteredAndSortedItems.subList(fromIndex, toIndex);
     }
 
     private static boolean filterTrackItem(TrackItem trackItem, TrackItemFieldsProvider trackItemFieldsProvider,
