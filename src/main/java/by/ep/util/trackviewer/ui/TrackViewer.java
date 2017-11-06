@@ -182,13 +182,13 @@ public class TrackViewer {
             TreeItem treeItem = (TreeItem) item;
             if (treeItem.getData() instanceof DumpItem) {
                 DumpItem dumpItem = (DumpItem) treeItem.getData();
-                otherInfoText.setText(String.join("\n", dumpItem.dump));
-                if (treeItem.getItemCount() == 0 && !dumpItem.dump.isEmpty()) {
+                otherInfoText.setText(String.join("\n", dumpItem.stackTrace));
+                if (treeItem.getItemCount() == 0 && !dumpItem.stackTrace.isEmpty()) {
                     treeItem.getDisplay().asyncExec(new Runnable() {
                         @Override
                         public void run() {
 
-                            for (String dump : dumpItem.dump) {
+                            for (String dump : dumpItem.stackTrace) {
                                 TreeItem dumpChild = new TreeItem(treeItem, SWT.NONE);
                                 dumpChild.setText(dump);
                                 if (dump.startsWith("\tcom.") && !dump.startsWith("\tcom.sun.")) {
@@ -251,14 +251,14 @@ public class TrackViewer {
 
     private static void addDump(final Font boldFont, final TrackItem trackItem, final TreeItem treeItem) {
 
-        if (trackItem.dump != null && !trackItem.dump.isEmpty()) {
+        if (trackItem.samplingItems != null && !trackItem.samplingItems.isEmpty()) {
             final TreeItem samplingInfoTreeItem = new TreeItem(treeItem, SWT.NONE);
             samplingInfoTreeItem.setText(
                     new String[]{"Sampling Info", "", "", "", "", "", "", "", ""});
 
             treeItem.getDisplay().asyncExec(() -> {
 
-                        for (DumpItem dumpItem : trackItem.dump) {
+                        for (DumpItem dumpItem : trackItem.samplingItems) {
                             TreeItem dumpTreeItem = new TreeItem(samplingInfoTreeItem, SWT.NONE);
                             dumpTreeItem.setText(
                                     new String[]{"Dump", "", "", "", "", dumpItem.state, dumpItem.thread,
@@ -279,13 +279,14 @@ public class TrackViewer {
             List<TrackItem> filteredAndSortedItems = trackData.logLoader.getRootItems().stream()
 
                     .filter((TrackItem o) -> o.name != null
+                            || (o.thread != null)
                             || (o.children != null && !o.children.isEmpty())
-                            || (o.dump != null && !o.dump.isEmpty()))
+                            || (o.samplingItems != null && !o.samplingItems.isEmpty()))
 
                     .filter((TrackItem trackItem) -> filterTrackItem(trackItem, trackItemFieldsProvider,
                             trackData.filterExpression, trackData.isDeep))
 
-                    .sorted((TrackItem o1, TrackItem o2) -> (o1.time == null ? "" : o1.time).compareTo(o2.time))
+                    .sorted((TrackItem o1, TrackItem o2) -> nvl(nvl(o1.startTime, o1.time), "").compareTo(nvl(o2.startTime, o2.time)))
                     .collect(
                             Collectors.toList());
             trackData.paginationControl.setRecordsCount(filteredAndSortedItems.size());
@@ -304,6 +305,10 @@ public class TrackViewer {
             messageBox.open();
             return new ArrayList<>();
         }
+    }
+
+    private static String nvl(final String value1, final String value2) {
+        return (value1 == null) ? value2 : value1;
     }
 
     private static boolean filterTrackItem(TrackItem trackItem, TrackItemFieldsProvider trackItemFieldsProvider,

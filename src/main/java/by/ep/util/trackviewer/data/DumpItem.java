@@ -10,7 +10,7 @@ public class DumpItem {
     public final String state;
     public final boolean isNative;
 
-    public final List<String> dump = new ArrayList<>();
+    public final List<String> stackTrace = new ArrayList<>();
 
     public DumpItem(String id, String thread, String state, boolean isNative) {
 

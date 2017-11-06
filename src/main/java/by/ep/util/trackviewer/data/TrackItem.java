@@ -19,7 +19,7 @@ public class TrackItem {
     public int sqlCount;
     public int sqlTime;
     public String other;
-    public List<DumpItem> dump;
+    public List<DumpItem> samplingItems;
     public List<TrackItem> children;
 
     public TrackItem(String time, String thread, String name, String typ, String id, String parentId,

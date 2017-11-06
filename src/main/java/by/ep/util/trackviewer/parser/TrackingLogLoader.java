@@ -89,6 +89,8 @@ public class TrackingLogLoader {
     private Map<String, TrackItem> idToItemMap = new HashMap<>();
     private List<TrackItem> rootItems = new ArrayList<>();
     private Map<String, List<String>> stackItems = new HashMap<>();
+    private List<DumpItem> unboundSamples = new ArrayList<>();
+
 
 
     private String dirName;
@@ -179,7 +181,7 @@ public class TrackingLogLoader {
                     Matcher matcher;
                     if (dumpItem != null && line.startsWith("\t")
                             && (matcher = tryPattern(DUMP_PATTERN, line)) != null) {
-                        dumpItem.dump.add(matcher.group(1));
+                        dumpItem.stackTrace.add(matcher.group(1));
                     } else if (line.contains(" (SamplerRunner) Dump; states: ")
                             && (matcher = tryPattern(DUMP_START_PATTERN, line)) != null) {
                         ThreadStatItem threadStatItem = new ThreadStatItem(matcher.group(1),
@@ -191,17 +193,22 @@ public class TrackingLogLoader {
                         dumpItem = new DumpItem(matcher.group(1), matcher.group(2), matcher.group(4),
                                 Boolean.parseBoolean(matcher.group(5)));
                         final String threadName = dumpItem.thread;
+                        boolean isUnbound = true;
                         if (threadName != null && !dumpItem.isNative) {
                             for (int i = trackItems.size() - 1; i >= 0 && i > trackItems.size() - 1000; i--) {
                                 TrackItem item = trackItems.get(i);
                                 if (threadName.equals(item.thread) && item.parentId == null) {
-                                    if (item.dump == null) {
-                                        item.dump = new ArrayList<>();
+                                    if (item.samplingItems == null) {
+                                        item.samplingItems = new ArrayList<>();
                                     }
-                                    item.dump.add(dumpItem);
+                                    item.samplingItems.add(dumpItem);
+                                    isUnbound = false;
                                     break;
                                 }
                             }
+                        }
+                        if (isUnbound) {
+                            unboundSamples.add(dumpItem);
                         }
                     } else if ((matcher = tryPattern(START_PATTERN, line)) != null) {
                         boolean isStartItem = " Start;".equals(matcher.group(5));
@@ -331,6 +338,7 @@ public class TrackingLogLoader {
             }
             if (trackItem.startTime != null) {
                 startTrackItem.startTime = trackItem.startTime;
+                startTrackItem.time = trackItem.startTime;
             }
             if (trackItem.processTime > 0 || startTrackItem.processTime == START_ITEM_DEF_PROCESS_TIME) {
                 startTrackItem.processTime = trackItem.processTime;
@@ -396,6 +404,7 @@ public class TrackingLogLoader {
                         null);
                 idToItemMap.put(trackItem.parentId, parentItem);
                 rootItems.add(parentItem);
+                trackItems.add(parentItem);
             }
             if (parentItem.children == null) {
                 parentItem.children = new ArrayList<>();
@@ -407,17 +416,17 @@ public class TrackingLogLoader {
     private void buildTree() {
 
         for (TrackItem trackItem : trackItems) {
-            if (trackItem.dump != null && !trackItem.dump.isEmpty()) {
+            if (trackItem.samplingItems != null && !trackItem.samplingItems.isEmpty()) {
 
-                for (DumpItem dumpItem : trackItem.dump) {
-                    // expand dump
+                for (DumpItem dumpItem : trackItem.samplingItems) {
+                    // expand samplingItems
                     int i = 0;
-                    while (i < dumpItem.dump.size()) {
-                        final String hash = dumpItem.dump.get(i);
+                    while (i < dumpItem.stackTrace.size()) {
+                        final String hash = dumpItem.stackTrace.get(i);
                         List<String> cachedStack;
                         if (hash.length() == 40 && ((cachedStack = stackItems.get(hash)) != null)) {
-                            dumpItem.dump.remove(i);
-                            dumpItem.dump.addAll(i, cachedStack);
+                            dumpItem.stackTrace.remove(i);
+                            dumpItem.stackTrace.addAll(i, cachedStack);
                             i += cachedStack.size();
                         } else {
                             i++;
@@ -425,7 +434,38 @@ public class TrackingLogLoader {
                     }
                 }
             }
+
+            calculateSqlTime(trackItem);
+            calculateSqlCount(trackItem);
+
         }
+    }
+
+
+    private int calculateSqlTime(TrackItem trackItem) {
+        if (trackItem.sqlTime == 0) {
+            if (trackItem.children != null && !trackItem.children.isEmpty()) {
+                for (TrackItem childTrackItem : trackItem.children) {
+                    trackItem.sqlTime += calculateSqlTime(childTrackItem);
+                }
+            } else if ("SQL".equals(trackItem.typ) || trackItem.sqlCount > 0) {
+                trackItem.sqlTime = trackItem.processTime;
+            }
+        }
+        return trackItem.sqlTime;
+    }
+
+    private int calculateSqlCount(TrackItem trackItem) {
+        if (trackItem.sqlCount == 0) {
+            if (trackItem.children != null && !trackItem.children.isEmpty()) {
+                for (TrackItem childTrackItem : trackItem.children) {
+                    trackItem.sqlCount += calculateSqlCount(childTrackItem);
+                }
+            } else if ("SQL".equals(trackItem.typ)) {
+                trackItem.sqlCount = 1;
+            }
+        }
+        return trackItem.sqlCount;
     }
 
     public List<TrackItem> getRootItems() {
