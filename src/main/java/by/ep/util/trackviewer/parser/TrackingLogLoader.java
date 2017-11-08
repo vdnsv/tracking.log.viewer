@@ -198,11 +198,13 @@ public class TrackingLogLoader {
                             for (int i = trackItems.size() - 1; i >= 0 && i > trackItems.size() - 1000; i--) {
                                 TrackItem item = trackItems.get(i);
                                 if (threadName.equals(item.thread) && item.parentId == null) {
-                                    if (item.samplingItems == null) {
-                                        item.samplingItems = new ArrayList<>();
+                                    if (item.isStart) { // don't wire with "end" item
+                                        if (item.samplingItems == null) {
+                                            item.samplingItems = new ArrayList<>();
+                                        }
+                                        item.samplingItems.add(dumpItem);
+                                        isUnbound = false;
                                     }
-                                    item.samplingItems.add(dumpItem);
-                                    isUnbound = false;
                                     break;
                                 }
                             }
@@ -227,7 +229,8 @@ public class TrackingLogLoader {
                                 matcher.group(25),
                                 toInt(matcher.group(27), 0),
                                 toInt(matcher.group(29), 0),
-                                matcher.group(30)
+                                matcher.group(30),
+                                isStartItem
                         );
 
                         if (trackItem.id != null) {
@@ -245,11 +248,12 @@ public class TrackingLogLoader {
                         dumpItem = null;
                     } else if ((matcher = tryPattern(END_PATTERN, line)) != null) {
 
+                        final String curItemId = matcher.group(3);
                         TrackItem trackItem = new TrackItem(
                                 matcher.group(7),
                                 null,
                                 matcher.group(5),
-                                matcher.group(3),
+                                curItemId,
                                 matcher.group(1),
                                 matcher.group(11),
                                 matcher.group(7),
@@ -260,7 +264,8 @@ public class TrackingLogLoader {
                                 matcher.group(19),
                                 toInt(matcher.group(21), 0),
                                 toInt(matcher.group(23), 0),
-                                matcher.group(24)
+                                matcher.group(24),
+                                idToItemMap.get(curItemId) == null
                         );
                         lastTrackItem = processTrackItem(trackItem, false);
                         dumpItem = null;
@@ -368,6 +373,7 @@ public class TrackingLogLoader {
                     startTrackItem.other += "; " + trackItem.other;
                 }
             }
+            startTrackItem.isStart = false;
             return startTrackItem;
         }
     }
@@ -401,7 +407,7 @@ public class TrackingLogLoader {
                         trackItem.startTime, 0, 0,
                         0,
                         null, null, 0, 0,
-                        null);
+                        null, true);
                 idToItemMap.put(trackItem.parentId, parentItem);
                 rootItems.add(parentItem);
                 trackItems.add(parentItem);

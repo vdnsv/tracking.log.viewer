@@ -19,12 +19,13 @@ public class TrackItem {
     public int sqlCount;
     public int sqlTime;
     public String other;
+    public boolean isStart;
     public List<DumpItem> samplingItems;
     public List<TrackItem> children;
 
     public TrackItem(String time, String thread, String name, String typ, String id, String parentId,
             String startTime, int processTime, int otherInvocationsCount, int otherInvocationsTime,
-            String othersStart, String othersFinish, int sqlCount, int sqlTime, String other) {
+            String othersStart, String othersFinish, int sqlCount, int sqlTime, String other, boolean isStart) {
 
         this.time = time;
         this.thread = thread;
@@ -41,6 +42,7 @@ public class TrackItem {
         this.sqlCount = sqlCount;
         this.sqlTime = sqlTime;
         this.other = other;
+        this.isStart = isStart;
 
         if (startTime != null) {
             this.time = startTime;

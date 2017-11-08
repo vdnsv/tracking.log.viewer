@@ -1,12 +1,14 @@
 package by.ep.util.trackviewer.filter;
 
 public class TrackingExpressionBuilder {
+
     private String expression;
     private int p = 0;
 
     public static Expression build(String expression) {
 
-        TrackingExpressionBuilder builder = new TrackingExpressionBuilder(expression);
+        TrackingExpressionBuilder builder = new TrackingExpressionBuilder(
+                expression.replace("\r", " ").replace("\n", " ").replace("\t", " "));
         builder.skip(" ");
         return builder.build(0);
     }
