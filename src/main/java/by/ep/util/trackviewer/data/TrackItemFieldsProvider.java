@@ -1,12 +1,14 @@
-package by.ep.util.trackviewer.ui;
+package by.ep.util.trackviewer.data;
+
+import java.util.stream.Collectors;
 
 import by.ep.util.trackviewer.filter.FieldsProvider;
-import by.ep.util.trackviewer.data.TrackItem;
 
 public class TrackItemFieldsProvider extends FieldsProvider<TrackItem, Object> {
 
     @Override
     public Object apply(final TrackItem trackItem, final String variableName) {
+
         switch (variableName) {
             case "name":
                 return trackItem.name;
@@ -38,8 +40,12 @@ public class TrackItemFieldsProvider extends FieldsProvider<TrackItem, Object> {
                 return trackItem.sqlTime;
             case "params":
                 return trackItem.other;
-
-
+            case "dump":
+                return (trackItem.samplingItems == null || trackItem.samplingItems.isEmpty()) ? "" :
+                        trackItem.samplingItems.stream()
+                                .filter((DumpItem dumpItem) -> !dumpItem.stackTrace
+                                        .isEmpty())
+                                .flatMap(dumpItem -> dumpItem.stackTrace.stream()).collect(Collectors.joining(", "));
         }
         return null;
     }

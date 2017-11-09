@@ -22,9 +22,9 @@ public class PaginationControl extends Composite {
     private final Text totalPagesText;
     private final Text totalRecordsText;
 
-    public PaginationControl(Shell shell) {
+    public PaginationControl(Composite parent) {
 
-        super(shell, SWT.BORDER);
+        super(parent, SWT.BORDER);
 
         GridLayout groupGridLayout = new GridLayout(8, false);
         this.setLayout(groupGridLayout);
@@ -156,4 +156,5 @@ public class PaginationControl extends Composite {
             pageNumberChangedFunction.accept(this);
         }
     }
+
 }

@@ -18,9 +18,9 @@ public class FilterControl  extends Composite {
     private BiConsumer<Expression, Boolean> filterButtonClickFunc;
     private Text filterText;
 
-    public FilterControl(Shell shell) {
+    FilterControl(Composite parent) {
 
-        super(shell, SWT.BORDER);
+        super(parent, SWT.BORDER);
 
         GridLayout gridLayout = new GridLayout(2, false);
         this.setLayout(gridLayout);
@@ -39,9 +39,10 @@ public class FilterControl  extends Composite {
                 + "    othersFinish,\n"
                 + "    sqlCount,\n"
                 + "    sqlTime,\n"
-                + "    params\n\n"
+                + "    params,\n"
+                + "    dump\n\n"
                 + "Example:\n"
-                + "    (duration > 1000 && (name = 'Notification' || name = 'executeSql')) || sqlCount > 50");
+                + "    (duration > 1000 && (name = 'Notification' || name = 'executeSql')) || sqlCount > 50 || dump='com.'");
         GridData gridData = new GridData(SWT.FILL, SWT.FILL, true, false);
         gridData.verticalSpan = 2;
 
@@ -97,17 +98,17 @@ public class FilterControl  extends Composite {
         return filterButtonClickFunc;
     }
 
-    public void setFilterButtonClickFunc(
+    void setFilterButtonClickFunc(
             BiConsumer<Expression, Boolean> filterButtonClickFunc) {
 
         this.filterButtonClickFunc = filterButtonClickFunc;
     }
 
-    public String getFilterText() {
+    String getFilterText() {
         return this.filterText.getText();
     }
 
-    public void setFilterText(final String filterText) {
+    void setFilterText(final String filterText) {
         this.filterText.setText(filterText);
         if (filterText != null && !filterText.isEmpty()) {
             this.filterButtonClick(filterText, false);

@@ -61,8 +61,7 @@ public class TrackingLogLoader {
     );
 
     private static final Pattern DUMP_START_PATTERN = Pattern.compile(
-            TIME_PATTERNS +
-                    " \\(SamplerRunner\\) Dump; states: RUNNABLE=(\\d+),TIMED_WAITING=(\\d+),WAITING=(\\d+); forced: (\\d+); sampled: (\\d+)"
+            TIME_PATTERNS + " \\(SamplerRunner\\) Dump; states: ([_A-Z]+=(\\d+),?)+; forced: (\\d+); sampled: (\\d+)"
     );
 
     private static final Pattern DUMP_THREAD_PATTERN = Pattern.compile(
@@ -90,7 +89,6 @@ public class TrackingLogLoader {
     private List<TrackItem> rootItems = new ArrayList<>();
     private Map<String, List<String>> stackItems = new HashMap<>();
     private List<DumpItem> unboundSamples = new ArrayList<>();
-
 
 
     private String dirName;
@@ -173,6 +171,7 @@ public class TrackingLogLoader {
         Entry<String, TrackItem>[] oldIdToItemMapKeys = idToItemMap.entrySet().toArray(new Entry[0]);
 
         try (Scanner scanner = new Scanner(trackingLogFile)) {
+            ThreadStatItem threadStatItem = null;
             DumpItem dumpItem = null;
             TrackItem lastTrackItem = null;
             while (scanner.hasNext()) {
@@ -184,13 +183,13 @@ public class TrackingLogLoader {
                         dumpItem.stackTrace.add(matcher.group(1));
                     } else if (line.contains(" (SamplerRunner) Dump; states: ")
                             && (matcher = tryPattern(DUMP_START_PATTERN, line)) != null) {
-                        ThreadStatItem threadStatItem = new ThreadStatItem(matcher.group(1),
-                                Integer.parseInt(matcher.group(2)),
-                                Integer.parseInt(matcher.group(3)), Integer.parseInt(matcher.group(4)),
-                                Integer.parseInt(matcher.group(5)), Integer.parseInt(matcher.group(6)));
+                        threadStatItem = new ThreadStatItem(matcher.group(1),
+                                0, 0, 0, // FIXME
+                                Integer.parseInt(matcher.group(4)), Integer.parseInt(matcher.group(5)));
                         threadStatistics.add(threadStatItem);
                     } else if (line.startsWith("id: ") && (matcher = tryPattern(DUMP_THREAD_PATTERN, line)) != null) {
-                        dumpItem = new DumpItem(matcher.group(1), matcher.group(2), matcher.group(4),
+                        dumpItem = new DumpItem(threadStatItem == null ? null : threadStatItem.time, matcher.group(1),
+                                matcher.group(2), matcher.group(4),
                                 Boolean.parseBoolean(matcher.group(5)));
                         final String threadName = dumpItem.thread;
                         boolean isUnbound = true;
@@ -423,32 +422,39 @@ public class TrackingLogLoader {
 
         for (TrackItem trackItem : trackItems) {
             if (trackItem.samplingItems != null && !trackItem.samplingItems.isEmpty()) {
-
                 for (DumpItem dumpItem : trackItem.samplingItems) {
-                    // expand samplingItems
-                    int i = 0;
-                    while (i < dumpItem.stackTrace.size()) {
-                        final String hash = dumpItem.stackTrace.get(i);
-                        List<String> cachedStack;
-                        if (hash.length() == 40 && ((cachedStack = stackItems.get(hash)) != null)) {
-                            dumpItem.stackTrace.remove(i);
-                            dumpItem.stackTrace.addAll(i, cachedStack);
-                            i += cachedStack.size();
-                        } else {
-                            i++;
-                        }
-                    }
+                    expandDump(dumpItem);
                 }
             }
 
             calculateSqlTime(trackItem);
             calculateSqlCount(trackItem);
+        }
 
+        for (DumpItem dumpItem : unboundSamples) {
+            expandDump(dumpItem);
+        }
+    }
+
+    private void expandDump(DumpItem dumpItem) {
+        // expand samplingItems
+        int i = 0;
+        while (i < dumpItem.stackTrace.size()) {
+            final String hash = dumpItem.stackTrace.get(i);
+            List<String> cachedStack;
+            if (hash.length() == 40 && ((cachedStack = stackItems.get(hash)) != null)) {
+                dumpItem.stackTrace.remove(i);
+                dumpItem.stackTrace.addAll(i, cachedStack);
+                i += cachedStack.size();
+            } else {
+                i++;
+            }
         }
     }
 
 
     private int calculateSqlTime(TrackItem trackItem) {
+
         if (trackItem.sqlTime == 0) {
             if (trackItem.children != null && !trackItem.children.isEmpty()) {
                 for (TrackItem childTrackItem : trackItem.children) {
@@ -462,6 +468,7 @@ public class TrackingLogLoader {
     }
 
     private int calculateSqlCount(TrackItem trackItem) {
+
         if (trackItem.sqlCount == 0) {
             if (trackItem.children != null && !trackItem.children.isEmpty()) {
                 for (TrackItem childTrackItem : trackItem.children) {
@@ -479,4 +486,8 @@ public class TrackingLogLoader {
         return rootItems;
     }
 
+    public List<DumpItem> getUnboundSamples() {
+
+        return unboundSamples;
+    }
 }
