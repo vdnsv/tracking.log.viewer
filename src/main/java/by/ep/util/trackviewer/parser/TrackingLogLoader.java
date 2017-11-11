@@ -5,13 +5,12 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Scanner;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import by.ep.util.trackviewer.data.DumpItem;
 import by.ep.util.trackviewer.data.ThreadStatItem;
@@ -21,67 +20,6 @@ public class TrackingLogLoader {
     // private static final DateTimeFormatter dateFormat = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss,SSS");
 
     private static final int START_ITEM_DEF_PROCESS_TIME = 999999;
-    private static final String TIME_PATTERNS = "(\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2},\\d{3})";
-    private static final String THREAD_INTERNAL_PATTERN = "([^()]+(\\([^()]+\\))*)";
-    private static final String THREAD_PATTERN = "(\\(" + THREAD_INTERNAL_PATTERN + "\\))";
-
-    private static final Pattern START_PATTERN = Pattern.compile(
-            TIME_PATTERNS
-                    + " " + THREAD_PATTERN
-                    + "( Start;)?"
-                    + "( ID: (\\d+);)?"
-                    + "( TYPE: ([^;]+);)?"
-                    + "( name: ([^;]+);)?"
-                    + "( Start time: " + TIME_PATTERNS + ";)?"
-                    + "( Process time: (\\d+);)?"
-                    + "( ParentID: (\\d+);)?"
-                    + "( OtherInvocations count: (\\d+);)?"
-                    + "( OtherInvocations time: (\\d+);)?"
-                    + "( OthersStart: " + TIME_PATTERNS + ";)?"
-                    + "( OthersFinish: " + TIME_PATTERNS + ";)?"
-                    + "( SQL count: (\\d+);)?"
-                    + "( SQL time: (\\d+);)?"
-                    + "( .+)?"
-    );
-
-    private static final Pattern END_PATTERN = Pattern.compile(
-            "ID: (\\d+);"
-                    + "( TYPE: ([^;]+);)?"
-                    + "( name: ([^;]+);)?"
-                    + "( Start time: " + TIME_PATTERNS + ";)?"
-                    + "( Process time: (\\d+);)?"
-                    + "( ParentID: (\\d+);)?"
-                    + "( OtherInvocations count: (\\d+);)?"
-                    + "( OtherInvocations time: (\\d+);)?"
-                    + "( OthersStart: " + TIME_PATTERNS + ";)?"
-                    + "( OthersFinish: " + TIME_PATTERNS + ";)?"
-                    + "( SQL count: (\\d+);)?"
-                    + "( SQL time: (\\d+);)?"
-                    + "( .+)?"
-    );
-
-    private static final Pattern DUMP_START_PATTERN = Pattern.compile(
-            TIME_PATTERNS + " \\(SamplerRunner\\) Dump; states: ([_A-Z]+=(\\d+),?)+; forced: (\\d+); sampled: (\\d+)"
-    );
-
-    private static final Pattern DUMP_THREAD_PATTERN = Pattern.compile(
-            "id: (\\d+); name: " + THREAD_INTERNAL_PATTERN + "; state: ([^;]+); native: ([^)]+)"
-    );
-
-    private static final Pattern DUMP_PATTERN = Pattern.compile(
-            "\t([a-f0-9]{40})"
-    );
-
-    private static final Pattern STACK_START_PATTERM = Pattern.compile(
-            "^" + TIME_PATTERNS + " \\(SamplerRunner\\) StoreStateDelta; Size: (\\d+); Memory KB: (\\d+)"
-    );
-
-    private static final Pattern STACK_BLOCK_START = Pattern.compile(
-            "^([a-f0-9]{40})$"
-    );
-
-    private static final String ADDITIONAL_INFO_PATTERN_STR = "^Additional Info: (.+)$";
-
 
     private List<ThreadStatItem> threadStatistics = new ArrayList<>();
     private List<TrackItem> trackItems = new ArrayList<>();
@@ -151,7 +89,7 @@ public class TrackingLogLoader {
                             || line.contains(" (SamplerRunner) StoreCleanInfo; ")
                             || line.contains(" (SamplerRunner) StoreStateDelta; ")) {
                         latestStack = null;
-                    } else if (line.length() == 40 && tryPattern(STACK_BLOCK_START, line) != null) {
+                    } else if (line.trim().length() == 40) {
                         latestStack = new ArrayList<>();
                         stackItems.put(line, latestStack);
                     } else {
@@ -176,106 +114,62 @@ public class TrackingLogLoader {
             TrackItem lastTrackItem = null;
             while (scanner.hasNext()) {
                 final String line = scanner.nextLine();
-                if (!line.trim().isEmpty() && !line.contains(" (SamplerRunner) Tick: ")) {
-                    Matcher matcher;
-                    if (dumpItem != null && line.startsWith("\t")
-                            && (matcher = tryPattern(DUMP_PATTERN, line)) != null) {
-                        dumpItem.stackTrace.add(matcher.group(1));
-                    } else if (line.contains(" (SamplerRunner) Dump; states: ")
-                            && (matcher = tryPattern(DUMP_START_PATTERN, line)) != null) {
-                        threadStatItem = new ThreadStatItem(matcher.group(1),
-                                0, 0, 0, // FIXME
-                                Integer.parseInt(matcher.group(4)), Integer.parseInt(matcher.group(5)));
+                final String trimLine = line.trim();
+                if (!trimLine.isEmpty() && !trimLine.contains(" (SamplerRunner) Tick: ")) {
+
+                    if (line.startsWith("id: ")) {
+                        // start of dump
+                        // example: id: 1026; name: ServerService Thread Pool -- 51; state: BLOCKED; native: false
+
+                        dumpItem = parseDumpItem(line, threadStatItem == null ? null : threadStatItem.time);
+
+                    } else if (line.startsWith("\t") && trimLine.length() == 40) {
+                        // stack trace hash
+                        // example: 	b453b47aefe48ff38d0883ba7549588b424bb332
+
+                        if (dumpItem == null) {
+                            System.err.println("Not found dump for stack trace hash: " + line);
+                        } else {
+                            dumpItem.stackTrace.add(trimLine);
+                        }
+                    } else if (trimLine.contains(" (SamplerRunner) Dump; states: ")) {
+                        // Sample info
+                        // example: 2019-10-16 23:15:11,396 (SamplerRunner) Dump; states: WAITING=947,BLOCKED=3,TIMED_WAITING=103,RUNNABLE=44; forced: 1; sampled: 37
+
+                        threadStatItem = parseThreadStatItem(line);
                         threadStatistics.add(threadStatItem);
-                    } else if (line.startsWith("id: ") && (matcher = tryPattern(DUMP_THREAD_PATTERN, line)) != null) {
-                        dumpItem = new DumpItem(threadStatItem == null ? null : threadStatItem.time, matcher.group(1),
-                                matcher.group(2), matcher.group(4),
-                                Boolean.parseBoolean(matcher.group(5)));
-                        final String threadName = dumpItem.thread;
-                        boolean isUnbound = true;
-                        if (threadName != null && !dumpItem.isNative) {
-                            for (int i = trackItems.size() - 1; i >= 0 && i > trackItems.size() - 1000; i--) {
-                                TrackItem item = trackItems.get(i);
-                                if (threadName.equals(item.thread) && item.parentId == null) {
-                                    if (item.isStart) { // don't wire with "end" item
-                                        if (item.samplingItems == null) {
-                                            item.samplingItems = new ArrayList<>();
-                                        }
-                                        item.samplingItems.add(dumpItem);
-                                        isUnbound = false;
-                                    }
-                                    break;
-                                }
-                            }
-                        }
-                        if (isUnbound) {
-                            unboundSamples.add(dumpItem);
-                        }
-                    } else if ((matcher = tryPattern(START_PATTERN, line)) != null) {
-                        boolean isStartItem = " Start;".equals(matcher.group(5));
-                        TrackItem trackItem = new TrackItem(
-                                matcher.group(1),
-                                matcher.group(3),
-                                matcher.group(11),
-                                matcher.group(9),
-                                matcher.group(7),
-                                matcher.group(17),
-                                matcher.group(13),
-                                toInt(matcher.group(15), isStartItem ? START_ITEM_DEF_PROCESS_TIME : 0),
-                                toInt(matcher.group(19), 0),
-                                toInt(matcher.group(21), 0),
-                                matcher.group(23),
-                                matcher.group(25),
-                                toInt(matcher.group(27), 0),
-                                toInt(matcher.group(29), 0),
-                                matcher.group(30),
-                                isStartItem
-                        );
-
-                        if (trackItem.id != null) {
-                            int newId = Integer.parseInt(trackItem.id);
-                            if (newId == 1) {
-                                // if server was restarted
-                                idToItemMap.clear();
-                                System.out.println(
-                                        "Found server restart in file: " + trackingLogFile.getName() + " time: "
-                                                + trackItem.time + " line: " + line);
-                            }
-                        }
-
-                        lastTrackItem = processTrackItem(trackItem, isStartItem);
-                        dumpItem = null;
-                    } else if ((matcher = tryPattern(END_PATTERN, line)) != null) {
-
-                        final String curItemId = matcher.group(3);
-                        TrackItem trackItem = new TrackItem(
-                                matcher.group(7),
-                                null,
-                                matcher.group(5),
-                                curItemId,
-                                matcher.group(1),
-                                matcher.group(11),
-                                matcher.group(7),
-                                toInt(matcher.group(9), 0),
-                                toInt(matcher.group(13), 0),
-                                toInt(matcher.group(15), 0),
-                                matcher.group(17),
-                                matcher.group(19),
-                                toInt(matcher.group(21), 0),
-                                toInt(matcher.group(23), 0),
-                                matcher.group(24),
-                                idToItemMap.get(curItemId) == null
-                        );
-                        lastTrackItem = processTrackItem(trackItem, false);
-                        dumpItem = null;
                     } else if (line.startsWith("Additional Info: ")) {
                         if (lastTrackItem != null) {
                             lastTrackItem.other =
-                                    lastTrackItem.other == null ? line : lastTrackItem.other + "; " + line;
+                                    lastTrackItem.other == null ? line : lastTrackItem.other + "\n" + line;
                         }
+                    } else if (line.startsWith("ID: ")) {
+                        // example: ID: 1153; Start time: 2019-10-16 23:14:29,990; Process time: 256;
+
+                        lastTrackItem = processTrackItem(parseEndTrackItem(line));
+                        dumpItem = null;
+                    } else if (line.length() > 25 && Character.isDigit(line.charAt(0)) && line.charAt(19) == ','
+                            && line.charAt(24) == '(') {
+                        // example:
+                        // 2019-10-16 23:14:30,287 (MyEjb-test-service) Start; ID: 1163; TYPE: EJB; name: by.vdnsv.test.ejb.TestEjb.start;
+                        // or
+                        // 2019-10-16 23:14:30,300 (MyEjb-test-service) ID: 1163; Start time: 2019-10-16 23:14:30,287; Process time: 12; OtherInvocations count: 2; OtherInvocations time: 7; OthersStart: 2019-10-16 23:14:30,288; OthersFinish: 2019-10-16 23:14:30,299;
+
+                        lastTrackItem = processTrackItem(parseStartTrackItem(line));
+                        if (lastTrackItem.isStart && "1".equals(lastTrackItem.id)) {
+                            // if server was restarted
+                            idToItemMap.clear();
+                            System.out.println(
+                                    "Found server restart in file: " + trackingLogFile.getName() + " time: "
+                                            + lastTrackItem.time + " line: " + line);
+
+                        }
+                        dumpItem = null;
+
                     } else {
-                        System.err.println("Error line: " + line);
+                        System.err.println("Invalid line: " + line);
                     }
+
                 }
             }
         }
@@ -284,6 +178,163 @@ public class TrackingLogLoader {
             // keep only last page
             idToItemMap.remove(entry.getKey(), entry.getValue()); // don't search parent items in previous files
         }
+    }
+
+    private static TrackItem parseTrackItem(final String line) {
+        // RegExp isn't used to reach the maximum performance
+        String id = null;
+        String type = null;
+        String name = null;
+        String startTime = null;
+        int processTime = 0;
+        String parentId = null;
+        int otherInvocationsCount = 0;
+        int otherInvocationsTime = 0;
+        String othersStart = null;
+        String othersFinish = null;
+        int sqlCount = 0;
+        int sqlTime = 0;
+        String other = null;
+
+        for (String token : line.split("; ")) {
+            if (token.startsWith("ID: ")) {
+                id = token.substring(4);
+            } else if (token.startsWith("TYPE: ")) {
+                type = token.substring(6);
+            } else if (token.startsWith("name: ")) {
+                name = token.substring(6);
+            } else if (token.startsWith("Start time: ")) {
+                startTime = token.substring(12);
+            } else if (token.startsWith("Process time: ")) {
+                processTime = Integer.parseInt(token.substring(14));
+            } else if (token.startsWith("ParentID: ")) {
+                parentId = token.substring(10);
+            } else if (token.startsWith("OtherInvocations count: ")) {
+                otherInvocationsCount = Integer.parseInt(token.substring(24));
+            } else if (token.startsWith("OtherInvocations time: ")) {
+                otherInvocationsTime = Integer.parseInt(token.substring(23));
+            } else if (token.startsWith("OthersStart: ")) {
+                othersStart = token.substring(13);
+            } else if (token.startsWith("OthersFinish: ")) {
+                othersFinish = token.substring(14);
+            } else if (token.startsWith("SQL count: ")) {
+                sqlCount = Integer.parseInt(token.substring(11));
+            } else if (token.startsWith("SQL time: ")) {
+                sqlTime = Integer.parseInt(token.substring(10));
+            } else {
+                other = (other == null) ? token : "\n" + token;
+            }
+        }
+
+        return new TrackItem(startTime, null, name, type, id, parentId, startTime, processTime, otherInvocationsCount,
+                otherInvocationsTime, othersStart, othersFinish, sqlCount, sqlTime, other, false);
+    }
+
+    private TrackItem parseStartTrackItem(String line) {
+        // example:
+        // 2019-10-16 23:14:30,287 (MyEjb-test-service) Start; ID: 1163; TYPE: EJB; name: by.vdnsv.test.ejb.TestEjb.start;
+        // or
+        // 2019-10-16 23:14:30,300 (MyEjb-test-service) ID: 1163; Start time: 2019-10-16 23:14:30,287; Process time: 12; OtherInvocations count: 2; OtherInvocations time: 7; OthersStart: 2019-10-16 23:14:30,288; OthersFinish: 2019-10-16 23:14:30,299;
+        // 0123456789012345678901234567890
+        //           10        20
+
+        final String time = line.substring(0, 23);
+        final int threadNameEndIndex = line.indexOf(") ", 26);
+        final String threadName = line.substring(25, threadNameEndIndex);
+        int i = threadNameEndIndex + 2;
+        // System.out.println(line);
+        final boolean isStart = ((line.length() >= i + 6) && "Start;".equals(line.substring(i, i + 6)));
+        if (isStart) {
+            i += 7;
+        }
+        TrackItem trackItem = parseTrackItem(line.substring(i));
+        if (trackItem.time == null) {
+            trackItem.time = time;
+        }
+        trackItem.thread = threadName;
+        trackItem.isStart = isStart;
+        return trackItem;
+    }
+
+    private TrackItem parseEndTrackItem(String line) {
+        // example:
+        // ID: 1153; Start time: 2019-10-16 23:14:29,990; Process time: 256;
+
+        return parseTrackItem(line);
+    }
+
+    private ThreadStatItem parseThreadStatItem(String line) {
+        // example:
+        // 2019-10-16 23:15:11,396 (SamplerRunner) Dump; states: WAITING=947,BLOCKED=3,TIMED_WAITING=103,RUNNABLE=44; forced: 1; sampled: 37
+
+        return new ThreadStatItem(line.substring(0, 23),
+                getIntStatValue(line, "RUNNABLE="),
+                getIntStatValue(line, "TIMED_WAITING="),
+                getIntStatValue(line, "WAITING="),
+                getIntStatValue(line, "BLOCKED="),
+                getIntStatValue(line, "forced: "),
+                getIntStatValue(line, "sampled: "));
+    }
+
+    private static int getIntStatValue(final String line, final String prop) {
+
+        int i = line.indexOf(prop);
+        if (i < 0) {
+            return 0;
+        } else {
+            i += prop.length();
+            int k = i + 1;
+            while (k < line.length() && Character.isDigit(line.charAt(k))) {
+                k++;
+            }
+            return Integer.parseInt(line.substring(i, k));
+        }
+    }
+
+    private DumpItem parseDumpItem(String line, String time) {
+        // example:
+        // id: 1026; name: ServerService Thread Pool -- 51; state: BLOCKED; native: false
+
+        String id = null;
+        String threadName = null;
+        String state = null;
+        String isNative = null;
+        for (String token : line.split("; ")) {
+            if (token.startsWith("id: ")) {
+                id = token.substring(4);
+            } else if (token.startsWith("name: ")) {
+                threadName = token.substring(6);
+            } else if (token.startsWith("state: ")) {
+                state = token.substring(7);
+            } else if (token.startsWith("native: ")) {
+                isNative = token.substring(8);
+            } else {
+                System.err.println("Unknown token: " + token + " in the line " + line);
+            }
+        }
+
+        DumpItem dumpItem = new DumpItem(time, id, threadName, state, Boolean.parseBoolean(isNative));
+        boolean isUnbound = true;
+        if (threadName != null) {
+            for (int i = trackItems.size() - 1; i >= 0 && i > trackItems.size() - 1000; i--) {
+                TrackItem item = trackItems.get(i);
+                if (threadName.equals(item.thread) && item.parentId == null) {
+                    if (item.isStart) { // don't wire with "end" item
+                        if (item.samplingItems == null) {
+                            item.samplingItems = new ArrayList<>();
+                        }
+                        item.samplingItems.add(dumpItem);
+                        isUnbound = false;
+                    }
+                    break;
+                }
+            }
+        }
+        if (isUnbound) {
+            unboundSamples.add(dumpItem);
+        }
+
+        return dumpItem;
     }
 
 
@@ -309,10 +360,10 @@ public class TrackingLogLoader {
         return startTrackItem;
     }
 
-    private TrackItem processTrackItem(final TrackItem trackItem, boolean isStartItem) {
+    private TrackItem processTrackItem(final TrackItem trackItem) {
 
         TrackItem startTrackItem = null;
-        if (!isStartItem && trackItem.id != null) {
+        if (!trackItem.isStart && trackItem.id != null) {
             startTrackItem = findStartTrackItem(trackItem);
         }
 
@@ -369,7 +420,9 @@ public class TrackingLogLoader {
                 if (startTrackItem.other == null) {
                     startTrackItem.other = trackItem.other;
                 } else {
-                    startTrackItem.other += "; " + trackItem.other;
+                    if (!startTrackItem.other.contains(trackItem.other)) {
+                        startTrackItem.other += "\n" + trackItem.other;
+                    }
                 }
             }
             startTrackItem.isStart = false;
@@ -386,14 +439,6 @@ public class TrackingLogLoader {
         }
     }
 
-    private static Matcher tryPattern(final Pattern pattern, final String str) {
-
-        Matcher matcher = pattern.matcher(str);
-        if (matcher.find()) {
-            return matcher;
-        }
-        return null;
-    }
 
     private void addToParent(TrackItem trackItem) {
 
@@ -450,6 +495,7 @@ public class TrackingLogLoader {
                 i++;
             }
         }
+        Collections.reverse(dumpItem.stackTrace);
     }
 
 
