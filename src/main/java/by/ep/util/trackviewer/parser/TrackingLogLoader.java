@@ -251,6 +251,9 @@ public class TrackingLogLoader {
         if (trackItem.time == null) {
             trackItem.time = time;
         }
+        if (isStart && trackItem.processTime == 0) {
+            trackItem.processTime = START_ITEM_DEF_PROCESS_TIME;
+        }
         trackItem.thread = threadName;
         trackItem.isStart = isStart;
         return trackItem;
