@@ -46,7 +46,8 @@ public class TrackItemFieldsProvider extends FieldsProvider<TrackItem, Object> {
                                 .filter((DumpItem dumpItem) -> !dumpItem.stackTrace
                                         .isEmpty())
                                 .flatMap(dumpItem -> dumpItem.stackTrace.stream()).collect(Collectors.joining(", "));
+            default:
+                throw new IllegalArgumentException("Invalid variable name: " + variableName);
         }
-        return null;
     }
 }

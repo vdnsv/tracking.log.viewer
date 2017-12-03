@@ -38,8 +38,8 @@ class TrackingLogControl extends Composite {
     private static final String DIR_PARAM = "directory";
     private static final String FILTER_PARAM = "filter";
 
-    TrackingLogControl(Composite parent, FilesSelectControl filesSelectControl,
-            UnboundSamplesControl unboundSamplesControl) {
+    TrackingLogControl(final Composite parent, final FilesSelectControl filesSelectControl,
+            final UnboundSamplesControl unboundSamplesControl, final UnboundSamplesControl allSamplesControl) {
 
         super(parent, SWT.NONE);
         this.setLayout(new GridLayout(1, false));
@@ -77,8 +77,8 @@ class TrackingLogControl extends Composite {
         Text otherInfoText = new Text(sashForm, SWT.BORDER | SWT.V_SCROLL | SWT.WRAP);
         sashForm.setWeights(new int[]{3, 1});
 
-        final TrackData trackData = new TrackData(tree, null, paginationControl, unboundSamplesControl, null);
-        trackData.paginationControl = paginationControl;
+        final TrackData trackData = new TrackData(tree, null, paginationControl, unboundSamplesControl,
+                allSamplesControl, null);
         tree.setData(trackData);
 
         tree.addSelectionListener(new SelectionListener() {
@@ -181,7 +181,7 @@ class TrackingLogControl extends Composite {
             } else {
                 String text = treeItem.getText(8);
                 if (treeItem.getData() instanceof TrackItem) {
-                    text += "\n\n" + ((TrackItem) treeItem.getData()).toString();
+                    text += "\n\n" + (treeItem.getData()).toString();
                 }
                 otherInfoText.setText(text);
             }
@@ -197,7 +197,11 @@ class TrackingLogControl extends Composite {
         trackData.tree.removeAll();
         trackData.paginationControl.setCurrentPage(1);
         generateTrackingLogTree(trackData);
-        trackData.unboundSamplesControl.generateUnboundSamplesTree(trackData.logLoader.getUnboundSamples(), trackData.boldFont);
+        trackData.unboundSamplesControl
+                .generateUnboundSamplesTree(trackData.logLoader.getUnboundSamples(), trackData.boldFont);
+        trackData.allSamplesControl
+                .generateUnboundSamplesTree(trackData.logLoader.getAllSamples(), trackData.boldFont);
+
     }
 
     private static void setTreeItemText(TrackItem trackItem, TreeItem treeItem) {
@@ -234,7 +238,7 @@ class TrackingLogControl extends Composite {
         if (trackItem.samplingItems != null && !trackItem.samplingItems.isEmpty()) {
             final TreeItem samplingInfoTreeItem = new TreeItem(treeItem, SWT.NONE);
             samplingInfoTreeItem.setText(
-                    new String[]{"Sampling Info", "", "", "", "", "", "", "", ""});
+                    new String[]{"Sampling Info - standard", "", "", "", "", "", "", "", ""});
 
             treeItem.getDisplay().asyncExec(() -> {
 
@@ -245,6 +249,54 @@ class TrackingLogControl extends Composite {
                                             dumpItem.id,
                                             dumpItem.isNative ? "native" : "not native"});
                             dumpTreeItem.setData(dumpItem);
+                        }
+                    }
+            );
+
+            final TreeItem compactedSamplingInfoTreeItem = new TreeItem(treeItem, SWT.NONE);
+            compactedSamplingInfoTreeItem.setText(
+                    new String[]{"Sampling Info - compacted", "", "", "", "", "", "", "", ""});
+
+            treeItem.getDisplay().asyncExec(() -> {
+
+                        List<TreeItem> stackTracesFlatList = new ArrayList<>();
+                        for (DumpItem dumpItem : trackItem.samplingItems) {
+                            int i = 0;
+                            int j = 0;
+                            TreeItem parentItem = null;
+
+                            while (i < dumpItem.stackTrace.size() && j < stackTracesFlatList.size()) {
+                                if (!stackTracesFlatList.get(j).getText(0).equals(dumpItem.stackTrace.get(i))) {
+                                    j++;
+                                } else {
+                                    parentItem = stackTracesFlatList.get(j);
+                                    i++;
+                                }
+                            }
+
+                            if (i < dumpItem.stackTrace.size()) {
+                                if (parentItem == null) {
+                                    parentItem = compactedSamplingInfoTreeItem;
+                                }
+
+                                final TreeItem dumpTreeItem = new TreeItem(parentItem, SWT.NONE);
+                                dumpTreeItem.setText(
+                                        new String[]{"Dump", dumpItem.time, "", "", "", dumpItem.state, dumpItem.thread,
+                                                dumpItem.id,
+                                                dumpItem.isNative ? "native" : "not native"});
+                                dumpTreeItem.setData(dumpItem);
+                                while (i < dumpItem.stackTrace.size()) {
+                                    TreeItem stackTrace = new TreeItem(dumpTreeItem, SWT.NONE);
+                                    final String stackTraceText = dumpItem.stackTrace.get(i);
+                                    stackTrace.setText(stackTraceText);
+                                    if (stackTraceText.startsWith("\tcom.") && !stackTraceText.startsWith("\tcom.sun.")) {
+                                        stackTrace.setFont(boldFont);
+                                    }
+
+                                    stackTracesFlatList.add(stackTrace);
+                                    i++;
+                                }
+                            }
                         }
                     }
             );
@@ -335,21 +387,24 @@ class TrackingLogControl extends Composite {
 
     static class TrackData {
 
-        Tree tree;
+        final Tree tree;
         TrackingLogLoader logLoader;
-        PaginationControl paginationControl;
-        UnboundSamplesControl unboundSamplesControl;
+        final PaginationControl paginationControl;
+        final UnboundSamplesControl unboundSamplesControl;
+        final UnboundSamplesControl allSamplesControl;
         Expression filterExpression;
         boolean isDeep;
-        Font boldFont;
+        final Font boldFont;
 
         TrackData(Tree tree, TrackingLogLoader logLoader, PaginationControl paginationControl,
-                UnboundSamplesControl unboundSamplesControl, Expression filterExpression) {
+                UnboundSamplesControl unboundSamplesControl, UnboundSamplesControl allSamplesControl,
+                Expression filterExpression) {
 
             this.tree = tree;
             this.logLoader = logLoader;
             this.paginationControl = paginationControl;
             this.unboundSamplesControl = unboundSamplesControl;
+            this.allSamplesControl = allSamplesControl;
             this.filterExpression = filterExpression;
 
             FontData boldFontData = tree.getFont().getFontData()[0];

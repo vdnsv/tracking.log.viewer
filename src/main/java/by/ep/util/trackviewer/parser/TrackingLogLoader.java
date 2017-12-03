@@ -26,6 +26,7 @@ public class TrackingLogLoader {
     private Map<String, TrackItem> idToItemMap = new HashMap<>();
     private List<TrackItem> rootItems = new ArrayList<>();
     private Map<String, List<String>> stackItems = new HashMap<>();
+    private List<DumpItem> allSamples = new ArrayList<>();
     private List<DumpItem> unboundSamples = new ArrayList<>();
 
 
@@ -317,6 +318,7 @@ public class TrackingLogLoader {
         }
 
         DumpItem dumpItem = new DumpItem(time, id, threadName, state, Boolean.parseBoolean(isNative));
+        allSamples.add(dumpItem);
         boolean isUnbound = true;
         if (threadName != null) {
             for (int i = trackItems.size() - 1; i >= 0 && i > trackItems.size() - 1000; i--) {
@@ -469,17 +471,19 @@ public class TrackingLogLoader {
     private void buildTree() {
 
         for (TrackItem trackItem : trackItems) {
+            /*
             if (trackItem.samplingItems != null && !trackItem.samplingItems.isEmpty()) {
                 for (DumpItem dumpItem : trackItem.samplingItems) {
                     expandDump(dumpItem);
                 }
             }
+            */
 
             calculateSqlTime(trackItem);
             calculateSqlCount(trackItem);
         }
 
-        for (DumpItem dumpItem : unboundSamples) {
+        for (DumpItem dumpItem : allSamples) {
             expandDump(dumpItem);
         }
     }
@@ -538,5 +542,10 @@ public class TrackingLogLoader {
     public List<DumpItem> getUnboundSamples() {
 
         return unboundSamples;
+    }
+
+    public List<DumpItem> getAllSamples() {
+
+        return allSamples;
     }
 }

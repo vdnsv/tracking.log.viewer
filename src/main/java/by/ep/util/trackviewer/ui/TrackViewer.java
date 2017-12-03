@@ -28,14 +28,19 @@ public class TrackViewer {
         trackingLogTabItem.setText("Tracking Log");
 
         UnboundSamplesControl unboundSamplesComposite = new UnboundSamplesControl(tabFolder);
+        UnboundSamplesControl allSamplesComposite = new UnboundSamplesControl(tabFolder);
 
         TrackingLogControl trackingLogComposite = new TrackingLogControl(tabFolder, filesSelectControl,
-                unboundSamplesComposite);
+                unboundSamplesComposite, allSamplesComposite);
         trackingLogTabItem.setControl(trackingLogComposite);
 
         TabItem unboundSamplesTabItem = new TabItem(tabFolder, SWT.NONE);
         unboundSamplesTabItem.setText("Unbound Samples");
         unboundSamplesTabItem.setControl(unboundSamplesComposite);
+
+        TabItem allSamplesTabItem = new TabItem(tabFolder, SWT.NONE);
+        allSamplesTabItem.setText("All Samples");
+        allSamplesTabItem.setControl(allSamplesComposite);
 
         shell.pack();
         shell.setBounds(display.getClientArea());
