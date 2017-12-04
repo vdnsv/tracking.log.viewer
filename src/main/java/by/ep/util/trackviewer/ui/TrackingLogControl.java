@@ -271,6 +271,7 @@ class TrackingLogControl extends Composite {
                                 } else {
                                     parentItem = stackTracesFlatList.get(j);
                                     i++;
+                                    j++;
                                 }
                             }
 
