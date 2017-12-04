@@ -260,6 +260,9 @@ class TrackingLogControl extends Composite {
             treeItem.getDisplay().asyncExec(() -> {
 
                         List<TreeItem> stackTracesFlatList = new ArrayList<>();
+                        List<Integer> stackCountList = new ArrayList<>();
+                        List<Long> startTimeList = new ArrayList<>();
+                        List<Long> endTimeList = new ArrayList<>();
                         for (DumpItem dumpItem : trackItem.samplingItems) {
                             int i = 0;
                             int j = 0;
@@ -270,6 +273,9 @@ class TrackingLogControl extends Composite {
                                     j++;
                                 } else {
                                     parentItem = stackTracesFlatList.get(j);
+                                    stackCountList.set(j, stackCountList.get(j) + 1);
+                                    endTimeList.set(j, dumpItem.getLongTime());
+
                                     i++;
                                     j++;
                                 }
@@ -289,16 +295,26 @@ class TrackingLogControl extends Composite {
                                 while (i < dumpItem.stackTrace.size()) {
                                     TreeItem stackTrace = new TreeItem(dumpTreeItem, SWT.NONE);
                                     final String stackTraceText = dumpItem.stackTrace.get(i);
-                                    stackTrace.setText(stackTraceText);
+                                    stackTrace.setText(new String[] {stackTraceText, "", "", "", "", "", "", "", ""});
                                     if (stackTraceText.startsWith("\tcom.") && !stackTraceText.startsWith("\tcom.sun.")) {
                                         stackTrace.setFont(boldFont);
                                     }
 
                                     stackTracesFlatList.add(stackTrace);
+                                    stackCountList.add(1);
+                                    startTimeList.add(dumpItem.getLongTime());
+                                    endTimeList.add(dumpItem.getLongTime());
                                     i++;
                                 }
                             }
                         }
+
+                        for (int i = 0; i < stackTracesFlatList.size(); i++) {
+                            TreeItem stackTraceTreeItem = stackTracesFlatList.get(i);
+                            stackTraceTreeItem.setText(2, String.valueOf(endTimeList.get(i) - startTimeList.get(i)));
+                            stackTraceTreeItem.setText(4, stackCountList.get(i).toString());
+                        }
+
                     }
             );
         }
