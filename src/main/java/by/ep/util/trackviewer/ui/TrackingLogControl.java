@@ -241,14 +241,15 @@ class TrackingLogControl extends Composite {
                     new String[]{"Sampling Info - standard", "", "", "", "", "", "", "", ""});
 
             treeItem.getDisplay().asyncExec(() -> {
-
-                        for (DumpItem dumpItem : trackItem.samplingItems) {
-                            TreeItem dumpTreeItem = new TreeItem(samplingInfoTreeItem, SWT.NONE);
-                            dumpTreeItem.setText(
-                                    new String[]{"Dump", dumpItem.time, "", "", "", dumpItem.state, dumpItem.thread,
-                                            dumpItem.id,
-                                            dumpItem.isNative ? "native" : "not native"});
-                            dumpTreeItem.setData(dumpItem);
+                        if (!samplingInfoTreeItem.isDisposed()) {
+                            for (DumpItem dumpItem : trackItem.samplingItems) {
+                                TreeItem dumpTreeItem = new TreeItem(samplingInfoTreeItem, SWT.NONE);
+                                dumpTreeItem.setText(
+                                        new String[]{"Dump", dumpItem.time, "", "", "", dumpItem.state, dumpItem.thread,
+                                                dumpItem.id,
+                                                dumpItem.isNative ? "native" : "not native"});
+                                dumpTreeItem.setData(dumpItem);
+                            }
                         }
                     }
             );
@@ -286,25 +287,30 @@ class TrackingLogControl extends Composite {
                                     parentItem = compactedSamplingInfoTreeItem;
                                 }
 
-                                final TreeItem dumpTreeItem = new TreeItem(parentItem, SWT.NONE);
-                                dumpTreeItem.setText(
-                                        new String[]{"Dump", dumpItem.time, "", "", "", dumpItem.state, dumpItem.thread,
-                                                dumpItem.id,
-                                                dumpItem.isNative ? "native" : "not native"});
-                                dumpTreeItem.setData(dumpItem);
-                                while (i < dumpItem.stackTrace.size()) {
-                                    TreeItem stackTrace = new TreeItem(dumpTreeItem, SWT.NONE);
-                                    final String stackTraceText = dumpItem.stackTrace.get(i);
-                                    stackTrace.setText(new String[] {stackTraceText, "", "", "", "", "", "", "", ""});
-                                    if (stackTraceText.startsWith("\tcom.") && !stackTraceText.startsWith("\tcom.sun.")) {
-                                        stackTrace.setFont(boldFont);
-                                    }
+                                if (!parentItem.isDisposed()) {
+                                    final TreeItem dumpTreeItem = new TreeItem(parentItem, SWT.NONE);
+                                    dumpTreeItem.setText(
+                                            new String[]{"Dump", dumpItem.time, "", "", "", dumpItem.state,
+                                                    dumpItem.thread,
+                                                    dumpItem.id,
+                                                    dumpItem.isNative ? "native" : "not native"});
+                                    dumpTreeItem.setData(dumpItem);
+                                    while (i < dumpItem.stackTrace.size()) {
+                                        TreeItem stackTrace = new TreeItem(dumpTreeItem, SWT.NONE);
+                                        final String stackTraceText = dumpItem.stackTrace.get(i);
+                                        stackTrace
+                                                .setText(new String[]{stackTraceText, "", "", "", "", "", "", "", ""});
+                                        if (stackTraceText.startsWith("\tcom.") && !stackTraceText
+                                                .startsWith("\tcom.sun.")) {
+                                            stackTrace.setFont(boldFont);
+                                        }
 
-                                    stackTracesFlatList.add(stackTrace);
-                                    stackCountList.add(1);
-                                    startTimeList.add(dumpItem.getLongTime());
-                                    endTimeList.add(dumpItem.getLongTime());
-                                    i++;
+                                        stackTracesFlatList.add(stackTrace);
+                                        stackCountList.add(1);
+                                        startTimeList.add(dumpItem.getLongTime());
+                                        endTimeList.add(dumpItem.getLongTime());
+                                        i++;
+                                    }
                                 }
                             }
                         }
@@ -405,13 +411,13 @@ class TrackingLogControl extends Composite {
     static class TrackData {
 
         final Tree tree;
-        TrackingLogLoader logLoader;
         final PaginationControl paginationControl;
         final UnboundSamplesControl unboundSamplesControl;
         final UnboundSamplesControl allSamplesControl;
+        final Font boldFont;
+        TrackingLogLoader logLoader;
         Expression filterExpression;
         boolean isDeep;
-        final Font boldFont;
 
         TrackData(Tree tree, TrackingLogLoader logLoader, PaginationControl paginationControl,
                 UnboundSamplesControl unboundSamplesControl, UnboundSamplesControl allSamplesControl,
