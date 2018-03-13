@@ -9,4 +9,12 @@ Execute
 
 Or
   gradle run
+
+
+Known issues
+____________
+
+# Application crashes when after filtering number of pages less than selected page number.
+# SQL time can be calculated incorrectly
+
     
